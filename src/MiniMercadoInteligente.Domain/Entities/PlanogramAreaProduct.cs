@@ -1,0 +1,1 @@
+namespace MiniMercadoInteligente.Domain.Entities; public class PlanogramAreaProduct{public Guid AreaId{get;set;}public Guid ProductId{get;set;}public string ExpectedPosition{get;set;}="N/A";public int WeightToleranceGrams{get;set;}=50;public bool Active{get;set;}=true;}

@@ -1,0 +1,1 @@
+namespace MiniMercadoInteligente.Domain.Entities; public class Resident{public Guid ResidentId{get;set;}public Guid CondominiumId{get;set;}public string UnitNumber{get;set;}=default!;public string Status{get;set;}="Active";}

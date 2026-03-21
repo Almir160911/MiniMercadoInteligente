@@ -1,0 +1,1 @@
+namespace MiniMercadoInteligente.Domain.Entities; public class CartItem{public Guid CartItemId{get;set;}public Guid SessionId{get;set;}public Guid ProductId{get;set;}public string Sku{get;set;}=default!;public int Qty{get;set;}public DateTime ScannedAt{get;set;}public string Source{get;set;}="Totem";}

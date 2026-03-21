@@ -1,0 +1,1 @@
+namespace MiniMercadoInteligente.Domain.Entities; public class DeviceApiKey{public Guid DeviceApiKeyId{get;set;}public string DeviceId{get;set;}=default!;public string ApiKeyHash{get;set;}=default!;public string DeviceType{get;set;}="Sensor";public bool Active{get;set;}=true;public DateTime CreatedAt{get;set;}=DateTime.UtcNow;}
