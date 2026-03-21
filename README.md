@@ -29,3 +29,4 @@ Inclui campos de peso/QRCode em Product, payload jsonb em Alert e endpoint GET /
 ## v4.8.2 – CRUD de Produtos (Admin)
 - Admin-only: GET/POST/PUT/DELETE /api/v1/admin/products (+ GET by id)
 - DTOs: CreateProductRequest, UpdateProductRequest
+# MiniMercadoInteligente
