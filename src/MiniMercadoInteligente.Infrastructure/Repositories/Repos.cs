@@ -5,397 +5,333 @@ using MiniMercadoInteligente.Infrastructure.Data;
 
 namespace MiniMercadoInteligente.Infrastructure.Repositories;
 
-public class SessionRepository : ISessionRepository
+#region CartRepository
+
+public class CartRepository : ICartRepository
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext _context;
 
-    public SessionRepository(AppDbContext db)
+    public CartRepository(AppDbContext context)
     {
-        _db = db;
+        _context = context;
     }
 
-    public async Task<Session?> GetAsync(Guid sessionId, CancellationToken ct)
+    public async Task<List<CartItem>> ListBySessionAsync(Guid sessionId, CancellationToken ct)
     {
-        return await _db.Sessions.FirstOrDefaultAsync(x => x.SessionId == sessionId, ct);
-    }
-
-    public async Task<Session?> GetOpenByResidentAsync(Guid residentId, CancellationToken ct)
-    {
-        return await _db.Sessions
-            .FirstOrDefaultAsync(x => x.ResidentId == residentId && x.Status.ToString() == "Open", ct);
-    }
-
-    public async Task<Session?> GetOpenByDeviceAsync(string deviceId, CancellationToken ct)
-    {
-        return await _db.Sessions
-            .FirstOrDefaultAsync(x => x.DeviceId == deviceId && x.Status.ToString() == "Open", ct);
-    }
-
-    public async Task<List<Session>> ListAsync(DateTime? from, DateTime? to, string? status, CancellationToken ct)
-    {
-        var query = _db.Sessions.AsQueryable();
-
-        if (from.HasValue)
-            query = query.Where(x => x.StartedAt >= from.Value);
-
-        if (to.HasValue)
-            query = query.Where(x => x.StartedAt <= to.Value);
-
-        if (!string.IsNullOrWhiteSpace(status))
-            query = query.Where(x => x.Status.ToString() == status);
-
-        return await query
-            .OrderByDescending(x => x.StartedAt)
+        return await _context.CartItems
+            .Where(x => x.SessionId == sessionId)
             .ToListAsync(ct);
     }
 
+    public async Task<CartItem?> FindBySessionAndProductAsync(Guid sessionId, Guid productId, CancellationToken ct = default)
+    {
+        return await _context.CartItems
+            .FirstOrDefaultAsync(x => x.SessionId == sessionId && x.ProductId == productId, ct);
+    }
+
+    public async Task AddAsync(CartItem item, CancellationToken ct)
+    {
+        _context.CartItems.Add(item);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateAsync(CartItem item, CancellationToken ct = default)
+    {
+        _context.CartItems.Update(item);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task RemoveAsync(Guid sessionId, Guid itemId, CancellationToken ct)
+    {
+        var item = await _context.CartItems
+            .FirstOrDefaultAsync(x => x.SessionId == sessionId && x.CartItemId == itemId, ct);
+
+        if (item is null) return;
+
+        _context.CartItems.Remove(item);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task AddOrIncrementItemAsync(Guid sessionId, Guid productId, int qty, decimal unitPrice, CancellationToken ct = default)
+    {
+        var existing = await FindBySessionAndProductAsync(sessionId, productId, ct);
+
+        if (existing is null)
+        {
+            _context.CartItems.Add(new CartItem
+            {
+                CartItemId = Guid.NewGuid(),
+                SessionId = sessionId,
+                ProductId = productId,
+                Qty = qty,
+                OccurredAtUtc = DateTime.UtcNow,
+                Source = "AUTO"
+            });
+        }
+        else
+        {
+            existing.Qty += qty;
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task DecrementOrRemoveItemAsync(Guid sessionId, Guid productId, int qty, CancellationToken ct = default)
+    {
+        var existing = await FindBySessionAndProductAsync(sessionId, productId, ct);
+        if (existing is null) return;
+
+        existing.Qty -= qty;
+
+        if (existing.Qty <= 0)
+            _context.CartItems.Remove(existing);
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<decimal> GetSessionTotalAsync(Guid sessionId, CancellationToken ct = default)
+    {
+        var items = await _context.CartItems
+            .Where(x => x.SessionId == sessionId)
+            .ToListAsync(ct);
+
+        return items.Sum(x => x.Qty * 10m); // 🔥 ajustar depois com preço real
+    }
+
+    public async Task MarkAsCheckedOutAsync(Guid sessionId, CancellationToken ct = default)
+    {
+        // opcional: marcar flag futura
+        await Task.CompletedTask;
+    }
+
+    public async Task MarkItemsAsReconciledAsync(Guid sessionId, CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+    }
+}
+
+#endregion
+
+#region SessionRepository
+
+public class SessionRepository : ISessionRepository
+{
+    private readonly AppDbContext _context;
+
+    public SessionRepository(AppDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Session?> GetAsync(Guid sessionId, CancellationToken ct)
+        => await _context.Sessions.FindAsync([sessionId], ct);
+
     public async Task<Session> AddAsync(Session session, CancellationToken ct)
     {
-        _db.Sessions.Add(session);
-        await _db.SaveChangesAsync(ct);
+        _context.Sessions.Add(session);
+        await _context.SaveChangesAsync(ct);
         return session;
     }
 
     public async Task<Session> UpdateAsync(Session session, CancellationToken ct)
     {
-        _db.Sessions.Update(session);
-        await _db.SaveChangesAsync(ct);
+        _context.Sessions.Update(session);
+        await _context.SaveChangesAsync(ct);
         return session;
     }
-}
 
-public class CartRepository : ICartRepository
-{
-    private readonly AppDbContext _db;
-
-    public CartRepository(AppDbContext db)
+    public async Task<List<Session>> ListAsync(DateTime? from, DateTime? to, string? status, CancellationToken ct)
     {
-        _db = db;
+        return await _context.Sessions.ToListAsync(ct);
     }
 
-    public async Task<List<CartItem>> ListBySessionAsync(Guid sessionId, CancellationToken ct)
+    public async Task<Session?> GetOpenByResidentAsync(Guid residentId, CancellationToken ct)
     {
-        return await _db.CartItems
-            .Where(x => x.SessionId == sessionId)
-            .OrderBy(x => x.ScannedAt)
+        return await _context.Sessions
+            .FirstOrDefaultAsync(x => x.ResidentId == residentId && x.Status == SessionStatus.Open, ct);
+    }
+
+    public async Task<Session?> GetOpenByDeviceAsync(string deviceId, CancellationToken ct)
+    {
+        return await _context.Sessions
+            .FirstOrDefaultAsync(x => x.DeviceId == deviceId && x.Status == SessionStatus.Open, ct);
+    }
+
+    public async Task<Session?> GetOpenByTrackIdAsync(string trackId, CancellationToken ct = default)
+    {
+        return await _context.Sessions
+            .FirstOrDefaultAsync(x => x.ActiveTrackId == trackId && x.Status == SessionStatus.Open, ct);
+    }
+
+    public async Task<List<Session>> ListOpenByAreaAsync(string areaCode, CancellationToken ct = default)
+    {
+        return await _context.Sessions
+            .Where(x => x.CurrentAreaCode == areaCode && x.Status == SessionStatus.Open)
             .ToListAsync(ct);
     }
 
-    public async Task AddAsync(CartItem item, CancellationToken ct)
+    public async Task<Session> CreateOpenSessionAsync(
+        Guid residentId,
+        Guid condominiumId,
+        string deviceId,
+        string entryMethod,
+        string? entryGateId,
+        CancellationToken ct = default)
     {
-        _db.CartItems.Add(item);
-        await _db.SaveChangesAsync(ct);
+        var session = new Session
+        {
+            SessionId = Guid.NewGuid(),
+            ResidentId = residentId,
+            CondominiumId = condominiumId,
+            DeviceId = deviceId,
+            Status = SessionStatus.Open,
+            StartedAt = DateTime.UtcNow,
+            EnteredAtUtc = DateTime.UtcNow
+        };
+
+        _context.Sessions.Add(session);
+        await _context.SaveChangesAsync(ct);
+
+        return session;
     }
 
-    public async Task RemoveAsync(Guid sessionId, Guid itemId, CancellationToken ct)
+    public async Task CloseSessionAsync(Guid sessionId, DateTime endedAtUtc, DateTime? exitedAtUtc, CancellationToken ct = default)
     {
-        var entity = await _db.CartItems
-            .FirstOrDefaultAsync(x => x.SessionId == sessionId && x.CartItemId == itemId, ct);
+        var session = await GetAsync(sessionId, ct);
+        if (session is null) return;
 
-        if (entity is null)
-            return;
+        session.Status = SessionStatus.Closed;
+        session.EndedAt = endedAtUtc;
+        session.ExitedAtUtc = exitedAtUtc;
 
-        _db.CartItems.Remove(entity);
-        await _db.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateTrackingAsync(Guid sessionId, string? activeTrackId, string? currentAreaCode, decimal trackingConfidence, bool trackingLocked, CancellationToken ct = default)
+    {
+        var session = await GetAsync(sessionId, ct);
+        if (session is null) return;
+
+        session.ActiveTrackId = activeTrackId;
+        session.CurrentAreaCode = currentAreaCode;
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task MarkAutoCheckoutTriggeredAsync(Guid sessionId, DateTime triggeredAtUtc, CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+    }
+
+    public async Task BlockSessionAsync(Guid sessionId, string reason, CancellationToken ct = default)
+    {
+        var session = await GetAsync(sessionId, ct);
+        if (session is null) return;
+
+        session.Status = SessionStatus.Blocked;
+        await _context.SaveChangesAsync(ct);
     }
 }
 
+#endregion
+
+#region PaymentRepository
+
 public class PaymentRepository : IPaymentRepository
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext _context;
 
-    public PaymentRepository(AppDbContext db)
+    public PaymentRepository(AppDbContext context)
     {
-        _db = db;
+        _context = context;
     }
+
+    public async Task<Payment?> GetByIdAsync(Guid paymentId, CancellationToken ct = default)
+        => await _context.Payments.FindAsync([paymentId], ct);
 
     public async Task<Payment?> GetLastBySessionAsync(Guid sessionId, CancellationToken ct)
     {
-        return await _db.Payments
+        return await _context.Payments
             .Where(x => x.SessionId == sessionId)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<Payment?> FindByWebhookAsync(Guid? paymentId, string? gatewayRef, CancellationToken ct)
+    public async Task<Payment?> GetLastPendingBySessionAsync(Guid sessionId, CancellationToken ct = default)
     {
-        if (paymentId.HasValue)
-        {
-            var byId = await _db.Payments.FirstOrDefaultAsync(x => x.PaymentId == paymentId.Value, ct);
-            if (byId is not null)
-                return byId;
-        }
+        return await _context.Payments
+            .Where(x => x.SessionId == sessionId && x.Status == PaymentStatus.Pending)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+    }
 
-        if (!string.IsNullOrWhiteSpace(gatewayRef))
-        {
-            return await _db.Payments.FirstOrDefaultAsync(x => x.GatewayRef == gatewayRef, ct);
-        }
+    public async Task<List<Payment>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default)
+    {
+        return await _context.Payments
+            .Where(x => x.SessionId == sessionId)
+            .ToListAsync(ct);
+    }
 
-        return null;
+    public async Task<Payment?> GetLastByResidentAsync(Guid residentId, CancellationToken ct = default)
+    {
+        return await _context.Payments
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task AddAsync(Payment payment, CancellationToken ct)
     {
-        _db.Payments.Add(payment);
-        await _db.SaveChangesAsync(ct);
+        _context.Payments.Add(payment);
+        await _context.SaveChangesAsync(ct);
     }
 
     public async Task UpdateAsync(Payment payment, CancellationToken ct)
     {
-        _db.Payments.Update(payment);
-        await _db.SaveChangesAsync(ct);
-    }
-}
-
-public class ProductCatalogRepository : IProductCatalogRepository
-{
-    private readonly AppDbContext _db;
-
-    public ProductCatalogRepository(AppDbContext db)
-    {
-        _db = db;
+        _context.Payments.Update(payment);
+        await _context.SaveChangesAsync(ct);
     }
 
-    public async Task<List<Product>> ListProductsAsync(CancellationToken ct)
+    public async Task<Payment?> FindByWebhookAsync(Guid? paymentId, string? gatewayRef, CancellationToken ct)
     {
-        return await _db.Products
-            .OrderBy(x => x.Name)
-            .ToListAsync(ct);
+        return await _context.Payments
+            .FirstOrDefaultAsync(x =>
+                (paymentId != null && x.PaymentId == paymentId) ||
+                (gatewayRef != null && x.GatewayRef == gatewayRef), ct);
     }
 
-    public async Task<Product?> GetByIdAsync(Guid productId, CancellationToken ct)
+    public async Task<Payment> CreateAuthorizedChargeAsync(Guid sessionId, Guid residentId, decimal amount, string? token, CancellationToken ct = default)
     {
-        return await _db.Products.FirstOrDefaultAsync(x => x.ProductId == productId, ct);
-    }
-
-    public async Task<Product?> FindBySkuOrBarcodeAsync(string value, CancellationToken ct)
-    {
-        return await _db.Products.FirstOrDefaultAsync(x =>
-            x.Sku == value ||
-            x.Barcode == value ||
-            x.QrCode == value, ct);
-    }
-
-    public async Task<Product?> GetBySkuAsync(string sku, CancellationToken ct)
-    {
-        return await _db.Products.FirstOrDefaultAsync(x => x.Sku == sku, ct);
-    }
-
-    public async Task<Product> CreateAsync(Product product, CancellationToken ct)
-    {
-        _db.Products.Add(product);
-        await _db.SaveChangesAsync(ct);
-        return product;
-    }
-
-    public async Task<Product> UpdateAsync(Product product, CancellationToken ct)
-    {
-        _db.Products.Update(product);
-        await _db.SaveChangesAsync(ct);
-        return product;
-    }
-
-    public async Task<bool> DeleteAsync(Guid productId, CancellationToken ct)
-    {
-        var entity = await _db.Products.FirstOrDefaultAsync(x => x.ProductId == productId, ct);
-        if (entity is null)
-            return false;
-
-        _db.Products.Remove(entity);
-        await _db.SaveChangesAsync(ct);
-        return true;
-    }
-
-    public async Task<Product> UpsertProductAsync(Product product, CancellationToken ct)
-    {
-        var existing = await _db.Products
-            .FirstOrDefaultAsync(x => x.ProductId == product.ProductId || x.Sku == product.Sku, ct);
-
-        if (existing is null)
+        var payment = new Payment
         {
-            _db.Products.Add(product);
-            await _db.SaveChangesAsync(ct);
-            return product;
-        }
+            PaymentId = Guid.NewGuid(),
+            SessionId = sessionId,
+            Amount = amount,
+            Status = PaymentStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
 
-        existing.Name = product.Name;
-        existing.Barcode = product.Barcode;
-        existing.QrCode = product.QrCode;
-        existing.NominalWeightGrams = product.NominalWeightGrams;
-        existing.WeightToleranceGrams = product.WeightToleranceGrams;
-        existing.IsWeightControlled = product.IsWeightControlled;
-        existing.Active = product.Active;
+        _context.Payments.Add(payment);
+        await _context.SaveChangesAsync(ct);
 
-        _db.Products.Update(existing);
-        await _db.SaveChangesAsync(ct);
-        return existing;
+        return payment;
     }
 
-    public async Task<ProductPrice> SetPriceAsync(Guid productId, ProductPrice price, CancellationToken ct)
+    public async Task IncrementRetryCountAsync(Guid paymentId, CancellationToken ct = default)
     {
-        var existing = await _db.ProductPrices
-            .FirstOrDefaultAsync(x => x.ProductId == productId, ct);
-
-        if (existing is null)
-        {
-            price.ProductId = productId;
-            _db.ProductPrices.Add(price);
-            await _db.SaveChangesAsync(ct);
-            return price;
-        }
-
-        existing.Price = price.Price;
-        existing.Active = price.Active;
-
-        _db.ProductPrices.Update(existing);
-
-await _db.SaveChangesAsync(ct);
-return existing;
-        _db.ProductPrices.Update(existing);
-await _db.SaveChangesAsync(ct);
-return existing;
-        _db.ProductPrices.Update(existing);
-        await _db.SaveChangesAsync(ct);
-        return existing;
+        await Task.CompletedTask;
     }
 
-    public async Task<decimal> GetAverageActivePriceAsync(CancellationToken ct)
+    public async Task MarkRequiresReviewAsync(Guid paymentId, string reason, CancellationToken ct = default)
     {
-        var query = _db.ProductPrices.Where(x => x.Active);
-
-        if (!await query.AnyAsync(ct))
-            return 0m;
-
-        return await query.AverageAsync(x => x.Price, ct);
-    }
-}
-
-public class EventStoreRepository : IEventStore
-{
-    private readonly AppDbContext _db;
-
-    public EventStoreRepository(AppDbContext db)
-    {
-        _db = db;
+        await Task.CompletedTask;
     }
 
-    public async Task AppendAsync(EventRecord record, CancellationToken ct)
+    public async Task<List<Payment>> ListPendingAutoCheckoutAsync(CancellationToken ct = default)
     {
-        _db.EventRecords.Add(record);
-        await _db.SaveChangesAsync(ct);
-    }
-
-    public async Task<List<EventRecord>> GetBySessionAsync(Guid sessionId, CancellationToken ct)
-    {
-        return await _db.EventRecords
-            .Where(x => x.SessionId == sessionId)
-            .OrderBy(x => x.OccurredAt)
+        return await _context.Payments
+            .Where(x => x.Status == PaymentStatus.Pending)
             .ToListAsync(ct);
     }
 }
 
-public class AlertRepository : IAlertRepository
-{
-    private readonly AppDbContext _db;
-
-    public AlertRepository(AppDbContext db)
-    {
-        _db = db;
-    }
-
-    public async Task<Alert?> GetAsync(Guid alertId, CancellationToken ct)
-    {
-        return await _db.Alerts.FirstOrDefaultAsync(x => x.AlertId == alertId, ct);
-    }
-
-    public async Task<List<Alert>> ListBySessionAsync(Guid sessionId, CancellationToken ct)
-    {
-        return await _db.Alerts
-            .Where(x => x.SessionId == sessionId)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(ct);
-    }
-
-    public async Task<List<Alert>> ListAsync(
-        string? status,
-        string? type,
-        DateTime? from,
-        DateTime? to,
-        CancellationToken ct)
-    {
-        var query = _db.Alerts.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(status))
-            query = query.Where(x => x.Status.ToString() == status);
-
-        if (!string.IsNullOrWhiteSpace(type))
-            query = query.Where(x => x.Type == type);
-
-        if (from.HasValue)
-            query = query.Where(x => x.CreatedAt >= from.Value);
-
-        if (to.HasValue)
-            query = query.Where(x => x.CreatedAt <= to.Value);
-
-        return await query
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(ct);
-    }
-
-    public async Task<Alert> AddAsync(Alert alert, CancellationToken ct)
-    {
-        _db.Alerts.Add(alert);
-        await _db.SaveChangesAsync(ct);
-        return alert;
-    }
-
-    public async Task<Alert> UpdateAsync(Alert alert, CancellationToken ct)
-    {
-        _db.Alerts.Update(alert);
-        await _db.SaveChangesAsync(ct);
-        return alert;
-    }
-}
-
-public class DeviceApiKeyRepository : IDeviceApiKeyRepository
-{
-    private readonly AppDbContext _db;
-
-    public DeviceApiKeyRepository(AppDbContext db)
-    {
-        _db = db;
-    }
-
-    public async Task<DeviceApiKey?> FindByHashAsync(string hash, CancellationToken ct)
-    {
-        return await _db.DeviceApiKeys
-            .FirstOrDefaultAsync(x => x.ApiKeyHash == hash, ct);
-    }
-
-    public async Task<DeviceApiKey?> FindByDeviceIdAsync(string deviceId, CancellationToken ct)
-    {
-        return await _db.DeviceApiKeys
-            .FirstOrDefaultAsync(x => x.DeviceId == deviceId, ct);
-    }
-
-    public async Task<DeviceApiKey> UpsertAsync(DeviceApiKey entity, CancellationToken ct)
-    {
-        var existing = await _db.DeviceApiKeys
-            .FirstOrDefaultAsync(x => x.DeviceId == entity.DeviceId, ct);
-
-        if (existing is null)
-        {
-            _db.DeviceApiKeys.Add(entity);
-            await _db.SaveChangesAsync(ct);
-            return entity;
-        }
-
-        existing.DeviceType = entity.DeviceType;
-        existing.Active = entity.Active;
-        existing.ApiKeyHash = entity.ApiKeyHash;
-
-        _db.DeviceApiKeys.Update(existing);
-        await _db.SaveChangesAsync(ct);
-        return existing;
-    }
-}
+#endregion

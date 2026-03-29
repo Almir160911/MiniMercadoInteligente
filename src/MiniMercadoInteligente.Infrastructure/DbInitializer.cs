@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MiniMercadoInteligente.Domain.Entities;
+using MiniMercadoInteligente.Infrastructure.Data;
 
 namespace MiniMercadoInteligente.Infrastructure;
 
@@ -37,7 +38,7 @@ public static class DbInitializer
                 ProductId = product.ProductId,
                 Price = 3.50m,
                 Currency = "BRL",
-                EffectiveFrom = DateTime.UtcNow,
+                EffectiveAtUtc = DateTime.UtcNow,
                 Active = true
             });
 

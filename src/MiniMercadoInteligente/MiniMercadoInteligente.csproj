@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
   </ItemGroup>
@@ -18,5 +22,9 @@
     <ProjectReference Include="..\MiniMercadoInteligente.Infrastructure\MiniMercadoInteligente.Infrastructure.csproj" />
     <ProjectReference Include="..\MiniMercadoInteligente.Domain\MiniMercadoInteligente.Domain.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+  <ProjectReference Include="..\MiniMercadoInteligente.Infrastructure\MiniMercadoInteligente.Infrastructure.csproj" />
+</ItemGroup>
 
 </Project>

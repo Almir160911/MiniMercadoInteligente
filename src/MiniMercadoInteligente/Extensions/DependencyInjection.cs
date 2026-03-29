@@ -10,7 +10,12 @@ public static class DependencyInjection
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
-        services.AddScoped<IFraudService, FraudService>();
+        services.AddScoped<IFraudEngineService, FraudEngineService>();
+
+        services.AddScoped<IFraudRule, QuantityDivergenceFraudRule>();
+        services.AddScoped<IFraudRule, ExitWithoutPaymentFraudRule>();
+        services.AddScoped<IFraudRule, WeightEventWithoutCartFraudRule>();
+        services.AddScoped<IFraudRule, BurstEventFraudRule>();
         services.AddScoped<IAlertService, AlertService>();
         services.AddScoped<IEventIngestService, EventIngestService>();
         services.AddScoped<IAdminService, AdminService>();

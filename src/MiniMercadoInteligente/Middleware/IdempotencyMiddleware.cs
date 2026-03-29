@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using MiniMercadoInteligente.Infrastructure;
+using MiniMercadoInteligente.Infrastructure.Data;
 using MiniMercadoInteligente.Domain.Entities;
 
 namespace MiniMercadoInteligente.Api.Middleware;

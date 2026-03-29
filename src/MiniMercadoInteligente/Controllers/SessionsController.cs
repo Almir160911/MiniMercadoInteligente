@@ -5,7 +5,7 @@ using MiniMercadoInteligente.Application.Services;
 namespace MiniMercadoInteligente.Controllers;
 
 [ApiController]
-[Route("api/v1/sessions")]
+[Route("api/sessions")]
 public class SessionsController : ControllerBase
 {
     private readonly ISessionService _service;

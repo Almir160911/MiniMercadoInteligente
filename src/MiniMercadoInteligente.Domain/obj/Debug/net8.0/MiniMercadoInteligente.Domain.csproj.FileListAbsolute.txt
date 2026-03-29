@@ -17,6 +17,7 @@ INTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/n
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/MiniMercadoInteligente.Domain.AssemblyInfoInputs.cache
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/MiniMercadoInteligente.Domain.AssemblyInfo.cs
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/MiniMercadoInteligente.Domain.csproj.CoreCompileInputs.cache
+/home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/MiniMercadoInteligente.Domain.sourcelink.json
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/MiniMercadoInteligente.Domain.dll
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/refint/MiniMercadoInteligente.Domain.dll
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Domain/obj/Debug/net8.0/MiniMercadoInteligente.Domain.pdb

@@ -14,6 +14,7 @@ INTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/De
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/MiniMercadoInteligente.Application.AssemblyInfoInputs.cache
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/MiniMercadoInteligente.Application.AssemblyInfo.cs
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/MiniMercadoInteligente.Application.csproj.CoreCompileInputs.cache
+/home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/MiniMercadoInteligente.Application.sourcelink.json
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/MiniMerc.77494580.Up2Date
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/MiniMercadoInteligente.Application.dll
 /home/usuario/MINI-MERCADOINTELIGENTE/MiniMercadoInteligente/src/MiniMercadoInteligente.Application/obj/Debug/net8.0/refint/MiniMercadoInteligente.Application.dll

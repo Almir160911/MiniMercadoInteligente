@@ -42,7 +42,7 @@ public interface IAdminService
 
 public interface IProductCrudService
 {
-    Task<List<ProductResponse>> ListAsync(CancellationToken ct);
+    Task<List<ProductResponse>> ListAsync(bool? active, CancellationToken ct);
     Task<ProductResponse?> GetAsync(Guid productId, CancellationToken ct);
     Task<ProductResponse> CreateAsync(CreateProductRequest req, CancellationToken ct);
     Task<ProductResponse> UpdateAsync(Guid productId, UpdateProductRequest req, CancellationToken ct);
@@ -84,18 +84,22 @@ public class SessionService : ISessionService
     private readonly IAlertRepository _alerts;
     private readonly IReconciliationService _reconciliation;
 
+    private readonly IFraudEngineService _fraudEngine;
+
     public SessionService(
         ISessionRepository sessions,
         ICartRepository cart,
         IPaymentRepository payments,
         IAlertRepository alerts,
-        IReconciliationService reconciliation)
+        IReconciliationService reconciliation,
+        IFraudEngineService fraudEngine)
     {
         _sessions = sessions;
         _cart = cart;
         _payments = payments;
         _alerts = alerts;
         _reconciliation = reconciliation;
+        _fraudEngine = fraudEngine;
     }
 
     public async Task<CreateSessionResponse> CreateAsync(CreateSessionRequest req, CancellationToken ct)
@@ -160,54 +164,61 @@ public class SessionService : ISessionService
 
         var reconciliation = await _reconciliation.RunAsync(sessionId, ct);
 
-        session.Status = SessionStatus.Closed;
-        session.EndedAt = DateTime.UtcNow;
-        session.FraudSuspected = reconciliation.DivergenceQty > 0;
-        session.FraudScore = Math.Min(100, reconciliation.DivergenceQty * 10);
+    session.Status = SessionStatus.Closed;
+    session.EndedAt = DateTime.UtcNow;
 
-        await _sessions.UpdateAsync(session, ct);
+    await _sessions.UpdateAsync(session, ct);
+    await _fraudEngine.ApplyToSessionAsync(sessionId, ct);
 
-        if (reconciliation.DivergenceQty > 0)
+    session = await _sessions.GetAsync(sessionId, ct)
+        ?? throw new InvalidOperationException("Sessão não encontrada após antifraude.");
+
+    var fraudResult = await _fraudEngine.EvaluateAsync(sessionId, ct);
+
+    var decision = FraudScorePolicy.Decide(fraudResult.FraudScore);
+
+    foreach (var flag in fraudResult.Flags.Where(x => x.Severity is "MEDIUM" or "HIGH"))
+    {
+        var alert = new Alert
         {
-            var alert = new Alert
-            {
-                AlertId = Guid.NewGuid(),
-                SessionId = sessionId,
-                Type = "Divergence",
-                EstimatedLoss = reconciliation.EstimatedLoss,
-                CreatedAt = DateTime.UtcNow,
-                PayloadJson = JsonSerializer.Serialize(new
-                {
-                    reconciliation.SessionId,
-                    reconciliation.EstimatedQty,
-                    reconciliation.PaidQty,
-                    reconciliation.DivergenceQty,
-                    reconciliation.EstimatedLoss,
-                    reconciliation.Confidence,
-                    reason = req.Reason
-                }),
-                Status = AlertStatus.Open,
-                Severity = AlertSeverity.High
-            };
+            AlertId = Guid.NewGuid(),
+            SessionId = sessionId,
+            Type = flag.Code,
+            EstimatedLoss = reconciliation.EstimatedLoss,
+            CreatedAt = DateTime.UtcNow,
+            PayloadJson = JsonSerializer.Serialize(flag),
+            Status = AlertStatus.Open,
+            Severity = flag.Severity == "HIGH" ? AlertSeverity.High : AlertSeverity.Medium
+        };
 
-            await _alerts.AddAsync(alert, ct);
-        }
-
-        return new CloseSessionResponse(
-            session.SessionId,
-            session.Status.ToString(),
-            reconciliation.PaidQty,
-            reconciliation.EstimatedQty,
-            reconciliation.DivergenceQty,
-            reconciliation.EstimatedLoss,
-            session.EndedAt,
-            session.FraudSuspected,
-            session.FraudScore
-        );
+        await _alerts.AddAsync(alert, ct);
     }
 
+    if (decision == FraudDecision.Block)
+    {
+        session = await _sessions.GetAsync(sessionId, ct)
+            ?? throw new InvalidOperationException("Sessão não encontrada.");
+
+        session.Status = SessionStatus.Blocked;
+        await _sessions.UpdateAsync(session, ct);
+    }
+       
+
+            return new CloseSessionResponse(
+                session.SessionId,
+                session.Status.ToString(),
+                reconciliation.PaidQty,
+                reconciliation.EstimatedQty,
+                reconciliation.DivergenceQty,
+                reconciliation.EstimatedLoss,
+                session.EndedAt,
+                session.FraudSuspected,
+                session.FraudScore
+            );
+        }
+
     private static CartItemDto MapCartItem(CartItem item) =>
-        new(item.CartItemId, item.ProductId, item.Sku, item.Qty, item.ScannedAt, item.Source);
+        new(item.CartItemId, item.ProductId, item.Sku, item.Qty, item.OccurredAtUtc, item.Source);
 
     private static PaymentDto MapPayment(Payment payment) =>
         new(payment.PaymentId, payment.Method, payment.Amount, payment.Status.ToString(), payment.PaidAt, payment.GatewayRef);
@@ -242,7 +253,7 @@ public class CartService : ICartService
                 x.ProductId,
                 x.Sku,
                 x.Qty,
-                x.ScannedAt,
+                x.OccurredAtUtc,
                 x.Source)).ToList()
         );
     }
@@ -260,7 +271,7 @@ public class CartService : ICartService
         ProductId = product.ProductId,
         Sku = product.Sku,
         Qty = req.Qty,
-        ScannedAt = DateTime.UtcNow,
+        OccurredAtUtc = DateTime.UtcNow,
         Source = string.IsNullOrWhiteSpace(req.Source) ? "Totem" : req.Source
     };
 
@@ -271,7 +282,7 @@ public class CartService : ICartService
         item.ProductId,
         item.Sku,
         item.Qty,
-        item.ScannedAt,
+        item.OccurredAtUtc,
         item.Source
     );
 }
@@ -429,13 +440,11 @@ public class ProductCrudService : IProductCrudService
         _catalog = catalog;
     }
 
-    public async Task<List<ProductResponse>> ListAsync(CancellationToken ct)
-    {
-        var list = await _catalog.ListProductsAsync(ct);
-
-        return list.Select(MapProduct).ToList();
-    }
-
+    public async Task<List<ProductResponse>> ListAsync(bool? active, CancellationToken ct)
+{
+    var list = await _catalog.ListProductsByStatusAsync(active, ct);
+    return list.Select(MapProduct).ToList();
+}
     public async Task<ProductResponse?> GetAsync(Guid productId, CancellationToken ct)
     {
         var product = await _catalog.GetByIdAsync(productId, ct);

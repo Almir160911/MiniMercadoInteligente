@@ -5,21 +5,25 @@ using MiniMercadoInteligente.Application.Services;
 namespace MiniMercadoInteligente.Controllers;
 
 [ApiController]
-[Route("api/v1/admin")]
+[Route("api/admin")]
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
     private readonly IProductCrudService _productService;
     private readonly IReconciliationService _reconciliationService;
 
+    private readonly IFraudEngineService _fraudEngine;
+
     public AdminController(
         IAdminService adminService,
         IProductCrudService productService,
-        IReconciliationService reconciliationService)
+        IReconciliationService reconciliationService,
+        IFraudEngineService fraudEngine)
     {
         _adminService = adminService;
         _productService = productService;
         _reconciliationService = reconciliationService;
+        _fraudEngine = fraudEngine;
     }
 
     [HttpPost("device-api-key")]
@@ -32,9 +36,11 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("products")]
-    public async Task<ActionResult<List<ProductResponse>>> ListProducts(CancellationToken ct)
+    public async Task<ActionResult<List<ProductResponse>>> ListProducts(
+        [FromQuery] bool? active,
+        CancellationToken ct)
     {
-        return Ok(await _productService.ListAsync(ct));
+        return Ok(await _productService.ListAsync(active, ct));
     }
 
     [HttpGet("products/{productId:guid}")]
@@ -74,6 +80,13 @@ public class AdminController : ControllerBase
     public async Task<ActionResult<ReconciliationResult>> Reconcile(Guid sessionId, CancellationToken ct)
     {
         var result = await _reconciliationService.RunAsync(sessionId, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("sessions/{sessionId:guid}/fraud-evaluate")]
+    public async Task<ActionResult<FraudEvaluationResult>> EvaluateFraud(Guid sessionId, CancellationToken ct)
+    {
+        var result = await _fraudEngine.EvaluateAsync(sessionId, ct);
         return Ok(result);
     }
 }
